@@ -2,28 +2,28 @@ const std = @import("std");
 
 pub const Gitto = struct {
     allocator: std.mem.Allocator,
-    token: []const u8,
 
     client: std.http.Client,
-    authorization_header: []const u8,
+    server_header_buffer: [4096]u8,
+    authorization_header_buffer: [100]u8,
 
     fn init(allocator: std.mem.Allocator, token: []const u8) !Gitto {
         const client = std.http.Client{ .allocator = allocator };
 
-        var authorization_header_buf: [64]u8 = undefined;
-        const authorization_header = try std.fmt.bufPrint(
-            &authorization_header_buf,
+        const server_header_buffer: [4096]u8 = undefined;
+        var authorization_header_buffer: [100]u8 = undefined;
+
+        _ = try std.fmt.bufPrint(
+            &authorization_header_buffer,
             "Bearer {s}",
-            .{
-                token,
-            },
+            .{token},
         );
 
         return Gitto{
             .allocator = allocator,
-            .token = token,
             .client = client,
-            .authorization_header = authorization_header,
+            .server_header_buffer = server_header_buffer,
+            .authorization_header_buffer = authorization_header_buffer,
         };
     }
 
@@ -31,27 +31,52 @@ pub const Gitto = struct {
         self.client.deinit();
     }
 
-    fn octocat(self: *Gitto) ![]u8 {
-        const uri = try std.Uri.parse("https://api.github.com/octocat");
-
-        var server_headers: [4096]u8 = undefined;
-        var request = try self.client.open(.GET, uri, .{
-            .server_header_buffer = &server_headers,
+    fn octocat(self: *Gitto, response: *std.ArrayList(u8)) !std.http.Status {
+        const status = try self.client.fetch(.{
+            .method = std.http.Method.GET,
+            .location = .{ .url = "https://api.github.com/octocat" },
+            .server_header_buffer = &self.server_header_buffer,
+            .response_storage = .{ .dynamic = response },
         });
 
-        defer request.deinit();
+        return status.status;
+    }
 
-        request.headers.authorization = .{
-            .override = self.authorization_header,
-        };
+    fn create_tag(self: *Gitto, response: *std.ArrayList(u8)) !std.http.Status {
+        var payload = std.ArrayList(u8).init(self.allocator);
+        defer payload.deinit();
 
-        try request.send();
-        try request.wait();
+        try std.json.stringify(.{
+            .owner = "o0th",
+            .repo = "gitto",
+            .ref = "refs/tags/v0.0.0",
+            .sha = "82cd2492ad06183b1fff18c46607ecc3a65a7f31",
+        }, .{}, payload.writer());
 
-        var body: [1024]u8 = undefined;
-        _ = try request.reader().readAll(&body);
+        const status = try self.client.fetch(.{
+            .method = std.http.Method.POST,
+            .location = .{
+                .url = "https://api.github.com/repos/o0th/gitto/git/refs",
+            },
+            .server_header_buffer = &self.server_header_buffer,
+            .headers = .{
+                .authorization = .{
+                    .override = &self.authorization_header_buffer,
+                },
+                .accept_encoding = .{
+                    .override = "application/vnd.github+json",
+                },
+                .content_type = .{
+                    .override = "application/json",
+                },
+            },
+            .response_storage = .{
+                .dynamic = response,
+            },
+            .payload = payload.items,
+        });
 
-        return &body;
+        return status.status;
     }
 };
 
@@ -79,8 +104,12 @@ pub fn main() !u8 {
     var gitto = try Gitto.init(allocator, GITHUB_TOKEN);
     defer gitto.deinit();
 
-    const octocat = try gitto.octocat();
-    try std.fmt.format(stdout, "{s}\n", .{octocat});
+    var response = std.ArrayList(u8).init(allocator);
+    defer response.deinit();
+
+    const octocat = try gitto.create_tag(&response);
+    try std.fmt.format(stdout, "Status: {}\n", .{octocat});
+    try std.fmt.format(stdout, "Response: {s}\n", .{response.items});
 
     return 0;
 }
