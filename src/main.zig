@@ -1,84 +1,5 @@
 const std = @import("std");
-
-pub const Gitto = struct {
-    allocator: std.mem.Allocator,
-
-    client: std.http.Client,
-    server_header_buffer: [4096]u8,
-    authorization_header_buffer: [100]u8,
-
-    fn init(allocator: std.mem.Allocator, token: []const u8) !Gitto {
-        const client = std.http.Client{ .allocator = allocator };
-
-        const server_header_buffer: [4096]u8 = undefined;
-        var authorization_header_buffer: [100]u8 = undefined;
-
-        _ = try std.fmt.bufPrint(
-            &authorization_header_buffer,
-            "Bearer {s}",
-            .{token},
-        );
-
-        return Gitto{
-            .allocator = allocator,
-            .client = client,
-            .server_header_buffer = server_header_buffer,
-            .authorization_header_buffer = authorization_header_buffer,
-        };
-    }
-
-    fn deinit(self: *Gitto) void {
-        self.client.deinit();
-    }
-
-    fn octocat(self: *Gitto, response: *std.ArrayList(u8)) !std.http.Status {
-        const status = try self.client.fetch(.{
-            .method = std.http.Method.GET,
-            .location = .{ .url = "https://api.github.com/octocat" },
-            .server_header_buffer = &self.server_header_buffer,
-            .response_storage = .{ .dynamic = response },
-        });
-
-        return status.status;
-    }
-
-    fn create_tag(self: *Gitto, response: *std.ArrayList(u8)) !std.http.Status {
-        var payload = std.ArrayList(u8).init(self.allocator);
-        defer payload.deinit();
-
-        try std.json.stringify(.{
-            .owner = "o0th",
-            .repo = "gitto",
-            .ref = "refs/tags/v0.0.0",
-            .sha = "82cd2492ad06183b1fff18c46607ecc3a65a7f31",
-        }, .{}, payload.writer());
-
-        const status = try self.client.fetch(.{
-            .method = std.http.Method.POST,
-            .location = .{
-                .url = "https://api.github.com/repos/o0th/gitto/git/refs",
-            },
-            .server_header_buffer = &self.server_header_buffer,
-            .headers = .{
-                .authorization = .{
-                    .override = &self.authorization_header_buffer,
-                },
-                .accept_encoding = .{
-                    .override = "application/vnd.github+json",
-                },
-                .content_type = .{
-                    .override = "application/json",
-                },
-            },
-            .response_storage = .{
-                .dynamic = response,
-            },
-            .payload = payload.items,
-        });
-
-        return status.status;
-    }
-};
+const Gitto = @import("gitto.zig").Gitto;
 
 pub fn main() !u8 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -107,9 +28,23 @@ pub fn main() !u8 {
     var response = std.ArrayList(u8).init(allocator);
     defer response.deinit();
 
-    const octocat = try gitto.create_tag(&response);
-    try std.fmt.format(stdout, "Status: {}\n", .{octocat});
+    _ = try gitto.octocat(&response);
     try std.fmt.format(stdout, "Response: {s}\n", .{response.items});
+
+    const create = try gitto.create_ref(
+        "o0th",
+        "gitto",
+        "refs/tags/v0.0.0",
+        "82cd2492ad06183b1fff18c46607ecc3a65a7f31",
+        &response,
+    );
+
+    try std.fmt.format(stdout, "Status: {}\n", .{create});
+    try std.fmt.format(stdout, "Response: {s}\n", .{response.items});
+
+    const delete = try gitto.delete_ref("o0th", "gitto", "refs/tags/v0.0.0");
+
+    try std.fmt.format(stdout, "Status: {}\n", .{delete});
 
     return 0;
 }
