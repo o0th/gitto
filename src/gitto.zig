@@ -87,6 +87,44 @@ pub const Gitto = struct {
         return status.status;
     }
 
+    pub fn update_ref(
+        self: *Gitto,
+        owner: []const u8,
+        repo: []const u8,
+        ref: []const u8,
+        sha: []const u8,
+        force: bool,
+        response: *std.ArrayList(u8),
+    ) !std.http.Status {
+        const location = try std.fmt.allocPrint(
+            self.allocator,
+            "{s}/repos/{s}/{s}/git/{s}",
+            .{ self.location, owner, repo, ref },
+        );
+
+        defer self.allocator.free(location);
+
+        var payload = std.ArrayList(u8).init(self.allocator);
+        defer payload.deinit();
+
+        try std.json.stringify(.{
+            .sha = sha,
+            .force = force,
+        }, .{}, payload.writer());
+
+        const status = try self.client.fetch(.{
+            .method = std.http.Method.PATCH,
+            .location = .{ .url = location },
+            .headers = self.headers,
+            .payload = payload.items,
+            .response_storage = .{
+                .dynamic = response,
+            },
+        });
+
+        return status.status;
+    }
+
     pub fn delete_ref(
         self: *Gitto,
         owner: []const u8,
