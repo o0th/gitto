@@ -6,12 +6,11 @@ const Headers = std.http.Client.Request.Headers;
 
 pub const Gitto = @This();
 
+location: *const [22]u8 = "https://api.github.com",
 allocator: std.mem.Allocator,
 
 client: Client,
 headers: Headers,
-
-location: *const [22]u8 = "https://api.github.com",
 
 pub fn init(allocator: std.mem.Allocator, token: []const u8) !Gitto {
     const client = Client{ .allocator = allocator };
@@ -77,7 +76,7 @@ pub fn create_ref(self: *Gitto, options: CreateRefOptions) !Status {
         .sha = options.sha,
     }, .{}, payload.writer());
 
-    const status = try self.client.fetch(.{
+    const response = try self.client.fetch(.{
         .method = std.http.Method.POST,
         .location = .{ .url = location },
         .headers = self.headers,
@@ -87,7 +86,7 @@ pub fn create_ref(self: *Gitto, options: CreateRefOptions) !Status {
         } else std.http.Client.FetchOptions.ResponseStorage.ignore,
     });
 
-    return status.status;
+    return response.status;
 }
 
 pub const UpdateRefOptions = struct {
@@ -116,7 +115,7 @@ pub fn update_ref(self: *Gitto, options: UpdateRefOptions) !Status {
         .force = options.force,
     }, .{}, payload.writer());
 
-    const status = try self.client.fetch(.{
+    const response = try self.client.fetch(.{
         .method = std.http.Method.PATCH,
         .location = .{ .url = location },
         .headers = self.headers,
@@ -126,7 +125,7 @@ pub fn update_ref(self: *Gitto, options: UpdateRefOptions) !Status {
         } else std.http.Client.FetchOptions.ResponseStorage.ignore,
     });
 
-    return status.status;
+    return response.status;
 }
 
 pub const DeleteRefOptions = struct {
@@ -144,11 +143,11 @@ pub fn delete_ref(self: *Gitto, options: DeleteRefOptions) !Status {
 
     defer self.allocator.free(location);
 
-    const status = try self.client.fetch(.{
+    const response = try self.client.fetch(.{
         .method = std.http.Method.DELETE,
         .location = .{ .url = location },
         .headers = self.headers,
     });
 
-    return status.status;
+    return response.status;
 }
