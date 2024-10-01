@@ -3,6 +3,7 @@ const std = @import("std");
 const Client = std.http.Client;
 const Status = std.http.Status;
 const Headers = std.http.Client.Request.Headers;
+const ResponseStorage = std.http.Client.FetchOptions.ResponseStorage;
 
 pub const Gitto = @This();
 
@@ -58,6 +59,8 @@ pub const CreateRefOptions = struct {
     response: ?*std.ArrayList(u8) = null,
 };
 
+/// Creates a reference
+/// https://docs.github.com/en/rest/git/refs?apiVersion=2022-11-28#create-a-reference
 pub fn create_ref(self: *Gitto, options: CreateRefOptions) !Status {
     const location = try std.fmt.allocPrint(
         self.allocator,
@@ -83,7 +86,7 @@ pub fn create_ref(self: *Gitto, options: CreateRefOptions) !Status {
         .payload = payload.items,
         .response_storage = if (options.response != null) .{
             .dynamic = options.response.?,
-        } else std.http.Client.FetchOptions.ResponseStorage.ignore,
+        } else ResponseStorage.ignore,
     });
 
     return response.status;
@@ -98,6 +101,8 @@ pub const UpdateRefOptions = struct {
     response: ?*std.ArrayList(u8) = null,
 };
 
+/// Update a reference
+/// https://docs.github.com/en/rest/git/refs?apiVersion=2022-11-28#update-a-reference
 pub fn update_ref(self: *Gitto, options: UpdateRefOptions) !Status {
     const location = try std.fmt.allocPrint(
         self.allocator,
@@ -122,7 +127,7 @@ pub fn update_ref(self: *Gitto, options: UpdateRefOptions) !Status {
         .payload = payload.items,
         .response_storage = if (options.response != null) .{
             .dynamic = options.response.?,
-        } else std.http.Client.FetchOptions.ResponseStorage.ignore,
+        } else ResponseStorage.ignore,
     });
 
     return response.status;
@@ -134,6 +139,8 @@ pub const DeleteRefOptions = struct {
     ref: []const u8,
 };
 
+/// Delete a reference
+/// https://docs.github.com/en/rest/git/refs?apiVersion=2022-11-28#delete-a-reference
 pub fn delete_ref(self: *Gitto, options: DeleteRefOptions) !Status {
     const location = try std.fmt.allocPrint(
         self.allocator,
