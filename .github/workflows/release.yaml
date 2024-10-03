@@ -31,7 +31,7 @@ jobs:
       - id: multihash
         run: |
           fetch="https://github.com/o0th/gitto/archive/refs/tags/${{ steps.release.outputs.release }}.tar.gz"
-          echo "multihash=$(zig $fetch)" >> $GITHUB_OUTPUT
+          echo "multihash=$(zig fetch $fetch)" >> $GITHUB_OUTPUT
 
       - uses: o0th/action-mustache-me@v0.1.0
         with:
