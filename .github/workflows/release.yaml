@@ -8,6 +8,7 @@ on:
       - src/**
       - build.zig
       - build.zig.zon
+  workflow_dispatch:
 
 permissions: 
   contents: write
