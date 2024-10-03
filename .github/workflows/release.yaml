@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - src/**
+      - build.zig
+      - build.zig.zon
+
+permissions: 
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - id: release
+        uses: o0th/action-create-release@v0.1.0
+
+      - uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.13.0
+
+      - id: multihash
+        run: |
+          fetch="https://github.com/o0th/gitto/archive/refs/tags/${{ steps.release.outputs.release }}.tar.gz"
+          echo "multihash=$(zig $fetch)" >> $GITHUB_OUTPUT
+
+      - uses: o0th/action-mustache-me@v0.1.0
+        with:
+          input-file: .github/readme.template.md
+          output-file: .github/readme.md
+          vars: |
+            {{multihash}} = ${{ steps.multihash.outputs.multihash }}
+            {{version}} = ${{ steps.release.outputs.version }}
+
+      - run: |
+          git diff
+          git checkout master
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git commit -am "docs: render readme"
+          git push origin master

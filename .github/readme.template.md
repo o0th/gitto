@@ -14,8 +14,8 @@ Add Gitto to your `build.zig.zon`
 
     .dependencies = .{
         .gitto = .{
-            .url = "https://github.com/o0th/gitto/archive/refs/tags/v0.0.0.tar.gz",
-            .hash = "1220a136b0f117b46169061a19f892f5ac65d7f621011fefe92bffcb4545c62fd0e1",
+            .url = "https://github.com/o0th/gitto/archive/refs/tags/{{version}}.tar.gz",
+            .hash = "{{multihash}}",
         },
     },
 
